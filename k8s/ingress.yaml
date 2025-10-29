@@ -1,0 +1,19 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: credcars-backend
+  namespace: staging
+  annotations:
+    kubernetes.io/ingress.class: nginx
+spec:
+  rules:
+    - host: devapi.credcars.com.ng
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: credcars-backend
+                port:
+                  number: 80
