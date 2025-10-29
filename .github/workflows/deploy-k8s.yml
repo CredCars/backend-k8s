@@ -59,6 +59,7 @@ jobs:
             echo "namespace=production" >> $GITHUB_OUTPUT
           else
             echo "namespace=staging" >> $GITHUB_OUTPUT
+          fi
 
       - name: Apply Kubernetes manifests
         run: |
