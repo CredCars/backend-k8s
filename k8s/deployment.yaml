@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: credcars-backend
-  namespace: staging  # replaced dynamically by GitHub Actions
+  namespace: production
   labels:
     app: credcars-backend
 spec:
@@ -20,19 +20,21 @@ spec:
           image: 211289421537.dkr.ecr.us-east-1.amazonaws.com/credcars-backend:latest
           imagePullPolicy: Always
           ports:
-            - containerPort: 3000
+            - containerPort: 8080
           envFrom:
+            - configMapRef:
+                name: credcars-backend-config
             - secretRef:
                 name: credcars-backend-secrets
           readinessProbe:
             httpGet:
               path: /health
-              port: 3000
+              port: 8080
             initialDelaySeconds: 10
             periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /health
-              port: 3000
+              port: 8080
             initialDelaySeconds: 30
             periodSeconds: 20

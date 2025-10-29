@@ -9,8 +9,8 @@ on:
 env:
   AWS_REGION: ${{ vars.AWS_REGION }}
   AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
-  ECR_BACKEND: ${{ vars.ECR_BACKEND }}  # e.g., credcars-backend
-  EKS_CLUSTER: ${{ vars.EKS_CLUSTER }}  # e.g., credcars-cluster
+  ECR_BACKEND: ${{ vars.ECR_BACKEND }}
+  EKS_CLUSTER: ${{ vars.EKS_CLUSTER }}
 
 jobs:
   build-and-deploy:
@@ -52,14 +52,75 @@ jobs:
           aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER }}
           kubectl get nodes
 
-      - name: Determine namespace
+      - name: Determine namespace and environment
         id: ns
         run: |
           if [[ "${GITHUB_REF##*/}" == "main" ]]; then
             echo "namespace=production" >> $GITHUB_OUTPUT
+            echo "env=production" >> $GITHUB_OUTPUT
           else
             echo "namespace=staging" >> $GITHUB_OUTPUT
+            echo "env=staging" >> $GITHUB_OUTPUT
           fi
+
+      # ----------------------------
+      # 🔐 Apply Secrets and ConfigMap
+      # ----------------------------
+      - name: Apply environment-specific secrets and configmap
+        run: |
+          NAMESPACE=${{ steps.ns.outputs.namespace }}
+          ENV=${{ steps.ns.outputs.env }}
+
+          # Set secrets based on environment
+          if [ "$ENV" = "production" ]; then
+            MONGODB_URI=${{ vars.MONGODB_URI_PROD }}
+            JWT_SECRET=${{ vars.JWT_SECRET }}
+            JWT_REFRESH_SECRET=${{ vars.JWT_REFRESH_SECRET }}
+            PORT=${{ vars.PORT }}
+            NODE_ENV="production"
+            ALLOWED_ORIGINS="${{ vars.ALLOWED_ORIGINS_PROD }}"
+            FRONTEND_URL="${{ vars.FRONTEND_URL_PROD }}"
+          else
+            MONGODB_URI=${{ vars.MONGODB_URI_STAGING }}
+            JWT_SECRET=${{ vars.JWT_SECRET }}
+            JWT_REFRESH_SECRET=${{ vars.JWT_REFRESH_SECRET }}
+            PORT=${{ vars.PORT }}
+            NODE_ENV="staging"
+            ALLOWED_ORIGINS="${{ vars.ALLOWED_ORIGINS_STAGING }}"
+            FRONTEND_URL="${{ vars.FRONTEND_URL_STAGING }}"
+          fi
+
+          # Create Secret manifest
+          cat <<EOF > secret.yaml
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: credcars-backend-secrets
+            namespace: ${NAMESPACE}
+          type: Opaque
+          stringData:
+            MONGODB_URI: "${MONGODB_URI}"
+            JWT_SECRET: "${JWT_SECRET}"
+            JWT_REFRESH_SECRET: "${JWT_REFRESH_SECRET}"
+          EOF
+
+          # Create ConfigMap manifest
+          cat <<EOF > configmap.yaml
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: credcars-backend-config
+            namespace: ${NAMESPACE}
+          data:
+            PORT: "${PORT}"
+            NODE_ENV: "${NODE_ENV}"
+            ALLOWED_ORIGINS: "${ALLOWED_ORIGINS}"
+            FRONTEND_URL: "${FRONTEND_URL}"
+          EOF
+
+          # Apply both
+          kubectl apply -f secret.yaml
+          kubectl apply -f configmap.yaml
 
       - name: Apply Kubernetes manifests
         run: |
@@ -73,9 +134,9 @@ jobs:
       - name: Update Deployment image
         run: |
           NAMESPACE=${{ steps.ns.outputs.namespace }}
-          kubectl -n $NAMESPACE set image deployment/credcars-backend backend=${{ steps.build-image.outputs.image }} --record
+          kubectl -n $NAMESPACE set image deployment/credcars-backend backend=${{ steps.build-image.outputs.image }}
 
       - name: Wait for rollout
         run: |
           NAMESPACE=${{ steps.ns.outputs.namespace }}
-          kubectl -n $NAMESPACE rollout status deployment/credcars-backend --timeout=3m
+          kubectl -n $NAMESPACE rollout status deployment/credcars-backend --timeout=5m
