@@ -65,15 +65,15 @@ jobs:
         run: |
           NAMESPACE=${{ steps.ns.outputs.namespace }}
           kubectl apply -f k8s/namespaces.yaml
-          sed "s/namespace: staging/namespace: $NAMESPACE/g" k8s/deployment.yaml | kubectl apply -f -
-          sed "s/namespace: staging/namespace: $NAMESPACE/g" k8s/service.yaml | kubectl apply -f -
-          sed "s/namespace: staging/namespace: $NAMESPACE/g" k8s/ingress.yaml | kubectl apply -f -
+          for file in k8s/deployment.yaml k8s/service.yaml k8s/ingress.yaml; do
+            echo "Applying $file to namespace $NAMESPACE"
+            sed "s/namespace: staging/namespace: ${NAMESPACE}/g" "$file" | kubectl apply -f -
+          done
 
       - name: Update Deployment image
         run: |
           NAMESPACE=${{ steps.ns.outputs.namespace }}
-          kubectl -n $NAMESPACE set image deployment/credcars-backend credcars-backend=${{ steps.build-image.outputs.image }} --record
-
+          kubectl -n $NAMESPACE set image deployment/credcars-backend backend=${{ steps.build-image.outputs.image }} --record
 
       - name: Wait for rollout
         run: |

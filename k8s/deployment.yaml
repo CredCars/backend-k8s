@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: <AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGION>.amazonaws.com/<ECR_BACKEND>:latest
+          image: 211289421537.dkr.ecr.us-east-1.amazonaws.com/credcars-backend:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 3000
