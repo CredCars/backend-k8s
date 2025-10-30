@@ -139,7 +139,7 @@ jobs:
       - name: Update Deployment image
         run: |
           NAMESPACE=${{ steps.ns.outputs.namespace }}
-          kubectl -n $NAMESPACE set image deployment/credcars-backend backend=${{ steps.build-image.outputs.image }}
+          kubectl -n $NAMESPACE set image deployment/credcars-backend credcars-backend=${{ steps.build-image.outputs.image }}
       
       - name: Force rollout if secret/config changed
         run: |
