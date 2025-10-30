@@ -25,9 +25,6 @@ jobs:
         with:
           node-version: 20
 
-      - name: Build app
-        run: npm ci && npm run build
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v3
         with:
@@ -38,22 +35,23 @@ jobs:
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build and push Docker image
+      - name: Build and push multi-arch Docker image
         id: build-image
         run: |
           IMAGE_TAG=${GITHUB_SHA::8}
           REPO_URI=${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_BACKEND }}
-          
-          # Install dependencies and build the app
-          npm install
-          npm run build
 
-          # Build Docker image with non-interactive apt
-          docker build -t ${REPO_URI}:${IMAGE_TAG} .
-                    
-          # Push Docker image to ECR
-          docker push ${REPO_URI}:${IMAGE_TAG}
-          printf "image=%s" "${REPO_URI}:${IMAGE_TAG}" >> $GITHUB_OUTPUT
+          # Set up Docker Buildx
+          docker buildx create --use --name mybuilder || true
+          docker buildx inspect --bootstrap
+
+          # Build multi-arch image and push to ECR
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            -t ${REPO_URI}:${IMAGE_TAG} \
+            --push .
+
+          echo "image=${REPO_URI}:${IMAGE_TAG}" >> $GITHUB_OUTPUT
 
       - name: Configure kubectl
         run: |
@@ -79,7 +77,6 @@ jobs:
           NAMESPACE=${{ steps.ns.outputs.namespace }}
           ENV=${{ steps.ns.outputs.env }}
 
-          # Set secrets based on environment
           if [ "$ENV" = "production" ]; then
             MONGODB_URI=${{ vars.MONGODB_URI_PROD }}
             JWT_SECRET=${{ vars.JWT_SECRET }}
