@@ -43,8 +43,15 @@ jobs:
         run: |
           IMAGE_TAG=${GITHUB_SHA::8}
           REPO_URI=${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_BACKEND }}
+          
+          # Install dependencies and build the app
+          npm install
+          npm run build
+
           # Build Docker image with non-interactive apt
-          docker build --build-arg DEBIAN_FRONTEND=noninteractive -t ${REPO_URI}:${IMAGE_TAG} .
+          docker build -t ${REPO_URI}:${IMAGE_TAG} .
+                    
+          # Push Docker image to ECR
           docker push ${REPO_URI}:${IMAGE_TAG}
           printf "image=%s" "${REPO_URI}:${IMAGE_TAG}" >> $GITHUB_OUTPUT
 
@@ -136,6 +143,12 @@ jobs:
         run: |
           NAMESPACE=${{ steps.ns.outputs.namespace }}
           kubectl -n $NAMESPACE set image deployment/credcars-backend backend=${{ steps.build-image.outputs.image }}
+      
+      - name: Force rollout if secret/config changed
+        run: |
+          NAMESPACE=${{ steps.ns.outputs.namespace }}
+          kubectl -n $NAMESPACE patch deployment credcars-backend \
+            -p "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"secret-last-updated\":\"$(date +%s)\",\"configmap-last-updated\":\"$(date +%s)\"}}}}}"
 
       - name: Wait for rollout
         run: |

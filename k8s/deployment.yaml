@@ -14,6 +14,10 @@ spec:
     metadata:
       labels:
         app: credcars-backend
+      annotations:
+        # This annotation forces a rollout whenever the config/secret changes
+        configmap-last-updated: "{{ .ConfigMapVersion }}"  # will be replaced in workflow
+        secret-last-updated: "{{ .SecretVersion }}"        # will be replaced in workflow
     spec:
       containers:
         - name: backend
