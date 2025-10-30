@@ -43,7 +43,8 @@ jobs:
         run: |
           IMAGE_TAG=${GITHUB_SHA::8}
           REPO_URI=${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_BACKEND }}
-          docker build -t ${REPO_URI}:${IMAGE_TAG} .
+          # Build Docker image with non-interactive apt
+          docker build --build-arg DEBIAN_FRONTEND=noninteractive -t ${REPO_URI}:${IMAGE_TAG} .
           docker push ${REPO_URI}:${IMAGE_TAG}
           printf "image=%s" "${REPO_URI}:${IMAGE_TAG}" >> $GITHUB_OUTPUT
 

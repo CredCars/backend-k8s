@@ -1,46 +1,36 @@
-# ---------- Build stage ----------
-FROM node:18-bookworm-slim AS builder
+# Use official Node.js LTS image
+FROM node:20-bullseye-slim
 
-# Use root to install dependencies
-USER root
-WORKDIR /app
+# Set environment variables to avoid interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Etc/UTC
 
-# Install essential build tools and dependencies
+# Install system dependencies
 RUN apt-get update -y && \
     apt-get install -y --no-install-recommends \
-       ca-certificates \
-       python3 \
-       make \
-       g++ \
-       git \
-       curl \
-       wget && \
-    rm -rf /var/lib/apt/lists/*
+        ca-certificates \
+        curl \
+        git \
+        python3 \
+        make \
+        g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /usr/src/app
 
 # Copy package files and install dependencies
 COPY package*.json ./
+RUN npm install --production
 
-# Use npm install instead of npm ci to avoid Node 18 issues
-RUN npm install --unsafe-perm --no-audit --no-fund && npm cache clean --force
-
-# Copy app source and build
+# Copy source code
 COPY . .
-RUN npm run build && npm prune --omit=dev
 
-# ---------- Runtime stage ----------
-FROM node:18-bookworm-slim AS runtime
+# Build (if using TypeScript or build step)
+# RUN npm run build
 
-WORKDIR /app
-
-# Copy production node_modules and build from builder
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/dist ./dist
-COPY package*.json ./
-
-ENV NODE_ENV=production
+# Expose port
 EXPOSE 8080
-ENV PORT=8080
 
-
-# Start NestJS app
+# Start the app
 CMD ["node", "dist/main.js"]
